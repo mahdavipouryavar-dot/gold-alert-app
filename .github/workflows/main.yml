@@ -1,34 +1,61 @@
 name: Gold Price Monitor Test
 
 on:
-  workflow_dispatch:
-  schedule:
-    - cron: "*/5 * * * *"
+workflow_dispatch:
+schedule:
+- cron: "*/5 * * * *"
 
 jobs:
-  monitor:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Fetch gold price
-        run: |
-          python - <<'PY'
-          import json
-          import urllib.request
+monitor:
+runs-on: ubuntu-latest
+steps:
+- name: Download repository files
+uses: actions/checkout@v4
 
-          url = "https://xaus.com/api/v1/spot"
-          req = urllib.request.Request(
-              url,
-              headers={"User-Agent": "GoldAlertApp/1.0"}
+```
+  - name: Check gold price and alerts
+    run: |
+      python - <<'PY'
+      import json
+      import urllib.request
+
+      url = "https://xaus.com/api/v1/spot"
+      req = urllib.request.Request(
+          url,
+          headers={"User-Agent": "GoldAlertApp/1.0"}
+      )
+
+      with urllib.request.urlopen(req, timeout=20) as response:
+          data = json.loads(response.read().decode("utf-8"))
+
+      price = float(data["spot_usd_oz"])
+      print(f"Current XAUUSD price: {price}")
+
+      with open("alerts.json", "r", encoding="utf-8") as f:
+          config = json.load(f)
+
+      for alert in config.get("alerts", []):
+          if not alert.get("enabled", False):
+              continue
+
+          level = float(alert["price"])
+          condition = alert["condition"]
+
+          triggered = (
+              condition == "above" and price > level
+          ) or (
+              condition == "below" and price < level
           )
 
-          with urllib.request.urlopen(req, timeout=20) as response:
-              data = json.loads(response.read().decode("utf-8"))
-
-          price = data.get("spot_usd_oz")
-
-          if price is None:
-              raise ValueError("Gold price field not found: " + str(data))
-
-          print("XAU spot price in USD per ounce:", price)
-          print("Data retrieved successfully.")
-          PY
+          if triggered:
+              print(
+                  f"ALERT TRIGGERED: {alert['name']} | "
+                  f"Price: {price} | Level: {level}"
+              )
+          else:
+              print(
+                  f"Alert not triggered: {alert['name']} | "
+                  f"Price: {price} | Level: {level}"
+              )
+      PY
+```
