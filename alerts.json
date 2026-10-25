@@ -1,0 +1,11 @@
+{
+"alerts": [
+{
+"name": "هشدار آزمایشی طلا",
+"symbol": "XAUUSD",
+"condition": "above",
+"price": 4500,
+"enabled": true
+}
+]
+}
