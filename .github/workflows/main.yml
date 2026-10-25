@@ -9,8 +9,26 @@ jobs:
   monitor:
     runs-on: ubuntu-latest
     steps:
-      - name: Check current time
+      - name: Fetch gold price
         run: |
-          echo "Gold alert monitor test"
-          date -u
-          echo "This is only a test. No live price or SMS is connected yet."
+          python - <<'PY'
+          import json
+          import urllib.request
+
+          url = "https://xaus.com/api/v1/spot"
+          req = urllib.request.Request(
+              url,
+              headers={"User-Agent": "GoldAlertApp/1.0"}
+          )
+
+          with urllib.request.urlopen(req, timeout=20) as response:
+              data = json.loads(response.read().decode("utf-8"))
+
+          price = data.get("spot_usd_oz")
+
+          if price is None:
+              raise ValueError("Gold price field not found: " + str(data))
+
+          print("XAU spot price in USD per ounce:", price)
+          print("Data retrieved successfully.")
+          PY
