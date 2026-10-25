@@ -1,0 +1,341 @@
+<!DOCTYPE html>
+<html lang="fa" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101722">
+  <title>هشدار طلای جهانی</title>
+
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: #101722;
+      color: #f3f5f7;
+      font-family: Tahoma, Arial, sans-serif;
+      font-size: 14px;
+    }
+
+    header {
+      padding: 22px 18px;
+      background: #192333;
+      border-bottom: 1px solid #344052;
+    }
+
+    header h1 {
+      margin: 0 0 8px;
+      color: #f2c66d;
+      font-size: 22px;
+    }
+
+    header p {
+      margin: 0;
+      color: #aab5c5;
+      line-height: 1.8;
+    }
+
+    main {
+      max-width: 950px;
+      margin: auto;
+      padding: 16px;
+    }
+
+    .card {
+      background: #192333;
+      border: 1px solid #344052;
+      border-radius: 14px;
+      padding: 17px;
+      margin-bottom: 16px;
+    }
+
+    h2 {
+      font-size: 17px;
+      margin: 0 0 15px;
+    }
+
+    .gold { color: #f2c66d; }
+
+    .chart {
+      height: 430px;
+      width: 100%;
+    }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      color: #cbd4e0;
+    }
+
+    input, select, button {
+      width: 100%;
+      padding: 12px;
+      border-radius: 9px;
+      font: inherit;
+    }
+
+    input, select {
+      background: #101722;
+      color: white;
+      border: 1px solid #435168;
+      outline: none;
+    }
+
+    input:focus, select:focus {
+      border-color: #f2c66d;
+    }
+
+    button {
+      background: #e8bb5f;
+      color: #18202b;
+      border: none;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    button:active { opacity: .8; }
+
+    .add-button { margin-top: 14px; }
+
+    .note {
+      color: #aab5c5;
+      font-size: 12px;
+      line-height: 1.9;
+    }
+
+    .alert-item {
+      background: #101722;
+      border: 1px solid #344052;
+      border-radius: 10px;
+      padding: 13px;
+      margin-top: 10px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+
+    .alert-item strong { color: #f2c66d; }
+
+    .delete-button {
+      width: auto;
+      padding: 8px 12px;
+      background: #8d3540;
+      color: white;
+      flex-shrink: 0;
+    }
+
+    .status {
+      color: #ffcc80;
+      line-height: 1.9;
+    }
+
+    footer {
+      text-align: center;
+      color: #8e9bad;
+      padding: 12px 18px 28px;
+      font-size: 12px;
+    }
+
+    @media (max-width: 520px) {
+      .form-grid { grid-template-columns: 1fr; }
+      .chart { height: 360px; }
+      header h1 { font-size: 20px; }
+    }
+  </style>
+</head>
+
+<body>
+  <header>
+    <h1>🥇 دستیار معاملات طلا</h1>
+    <p>نمودار XAUUSD و مدیریت سطوح هشدار قیمت</p>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>📈 نمودار طلای جهانی <span class="gold">XAUUSD</span></h2>
+      <p class="note">
+        قیمت هر اونس طلا به دلار آمریکا. برای تغییر تایم‌فریم،
+        از ابزارهای داخل نمودار استفاده کن.
+      </p>
+
+      <div class="chart">
+        <div id="tradingview_chart" style="height:100%;width:100%"></div>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>🔔 تنظیم هشدار قیمت</h2>
+
+      <form id="alertForm">
+        <div class="form-grid">
+          <div>
+            <label for="price">قیمت موردنظر (دلار)</label>
+            <input
+              id="price"
+              type="number"
+              min="0.01"
+              step="0.01"
+              placeholder="مثلاً 4050.50"
+              required
+            >
+          </div>
+
+          <div>
+            <label for="direction">شرط هشدار</label>
+            <select id="direction">
+              <option value="above">وقتی قیمت بالاتر برود ⬆️</option>
+              <option value="below">وقتی قیمت پایین‌تر بیاید ⬇️</option>
+            </select>
+          </div>
+        </div>
+
+        <button class="add-button" type="submit">
+          افزودن هشدار
+        </button>
+      </form>
+
+      <p class="note">
+        هشدارهای ثبت‌شده در همین مرورگر ذخیره می‌شوند.
+        در این نسخه هنوز بررسی خودکار قیمت و ارسال پیامک فعال نیست.
+      </p>
+    </section>
+
+    <section class="card">
+      <h2>📋 هشدارهای من</h2>
+      <div id="alertList"></div>
+      <p id="emptyMessage" class="note">
+        هنوز هشداری ثبت نکرده‌ای.
+      </p>
+    </section>
+
+    <section class="card">
+      <h2>📡 وضعیت سرویس</h2>
+      <p class="status">
+        نسخه اولیه: نمودار و مدیریت محلی هشدارها.
+        <br>
+        پایش قیمت هر ۳۰ ثانیه: هنوز متصل نشده.
+        <br>
+        ارسال پیامک به سیم‌کارت: هنوز متصل نشده.
+      </p>
+    </section>
+  </main>
+
+  <footer>
+    این ابزار برای مدیریت هشدارهای شخصی طراحی شده است.
+    پیش از معامله، قیمت و منبع داده را بررسی کن.
+  </footer>
+
+  <script>
+    // نمودار تریدینگ‌ویو
+    const chartScript = document.createElement("script");
+    chartScript.src =
+      "https://s3.tradingview.com/external-embedding/embed-widget-advanced-chart.js";
+    chartScript.async = true;
+
+    chartScript.innerHTML = JSON.stringify({
+      autosize: true,
+      symbol: "OANDA:XAUUSD",
+      interval: "15",
+      timezone: "Asia/Tehran",
+      theme: "dark",
+      style: "1",
+      locale: "en",
+      allow_symbol_change: true,
+      calendar: false,
+      support_host: "https://www.tradingview.com"
+    });
+
+    document.getElementById("tradingview_chart").appendChild(chartScript);
+
+    // هشدارها فقط روی همین مرورگر ذخیره می‌شوند.
+    const STORAGE_KEY = "gold_alerts_v1";
+    let alerts = [];
+
+    try {
+      alerts = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+      if (!Array.isArray(alerts)) alerts = [];
+    } catch (error) {
+      alerts = [];
+    }
+
+    const form = document.getElementById("alertForm");
+    const priceInput = document.getElementById("price");
+    const directionInput = document.getElementById("direction");
+    const alertList = document.getElementById("alertList");
+    const emptyMessage = document.getElementById("emptyMessage");
+
+    function saveAlerts() {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(alerts));
+      renderAlerts();
+    }
+
+    function renderAlerts() {
+      alertList.innerHTML = "";
+      emptyMessage.style.display = alerts.length ? "none" : "block";
+
+      alerts.forEach((alert) => {
+        const row = document.createElement("div");
+        row.className = "alert-item";
+
+        const info = document.createElement("div");
+        const title = document.createElement("strong");
+        title.textContent = "$" + Number(alert.price).toFixed(2);
+
+        const description = document.createElement("div");
+        description.className = "note";
+        description.textContent =
+          alert.direction === "above"
+            ? "هشدار هنگام عبور قیمت به بالا"
+            : "هشدار هنگام عبور قیمت به پایین";
+
+        info.appendChild(title);
+        info.appendChild(description);
+
+        const removeButton = document.createElement("button");
+        removeButton.className = "delete-button";
+        removeButton.textContent = "حذف";
+        removeButton.type = "button";
+
+        removeButton.addEventListener("click", () => {
+          alerts = alerts.filter(item => item.id !== alert.id);
+          saveAlerts();
+        });
+
+        row.appendChild(info);
+        row.appendChild(removeButton);
+        alertList.appendChild(row);
+      });
+    }
+
+    form.addEventListener("submit", (event) => {
+      event.preventDefault();
+
+      const price = Number(priceInput.value);
+
+      if (!Number.isFinite(price) || price <= 0) {
+        alert("لطفاً یک قیمت معتبر وارد کن.");
+        return;
+      }
+
+      alerts.push({
+        id: Date.now().toString() + Math.random().toString(16).slice(2),
+        price,
+        direction: directionInput.value,
+        createdAt: new Date().toISOString()
+      });
+
+      saveAlerts();
+      form.reset();
+    });
+
+    renderAlerts();
+  </script>
+</body>
+</html>
