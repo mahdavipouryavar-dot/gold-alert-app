@@ -8,12 +8,11 @@ schedule:
 jobs:
 monitor:
 runs-on: ubuntu-latest
+steps:
+- name: Download repository files
+uses: actions/checkout@v4
 
 ```
-steps:
-  - name: Download repository files
-    uses: actions/checkout@v4
-
   - name: Check gold price and alerts
     run: |
       python - <<'PY'
