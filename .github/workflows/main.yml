@@ -1,3 +1,4 @@
+```yaml
 name: Gold Price Monitor Test
 
 on:
@@ -12,12 +13,19 @@ jobs:
       - name: Download repository files
         uses: actions/checkout@v4
 
-      - name: Check gold price and alerts
+      - name: Check gold price and send SMS
+        env:
+          KAVENEGAR_API_KEY: ${{ secrets.KAVENEGAR_API_KEY }}
+          KAVENEGAR_SENDER: ${{ secrets.KAVENEGAR_SENDER }}
+          KAVENEGAR_RECEPTOR: ${{ secrets.KAVENEGAR_RECEPTOR }}
         run: |
           python - <<'PY'
           import json
+          import os
           import urllib.request
+          import urllib.parse
 
+          # دریافت قیمت طلا
           url = "https://xaus.com/api/v1/spot"
           req = urllib.request.Request(
               url,
@@ -30,30 +38,59 @@ jobs:
           price = float(data["spot_usd_oz"])
           print(f"Current XAUUSD price: {price}")
 
-          with open("alerts.json", "r", encoding="utf-8") as f:
-              config = json.load(f)
+          # حد هشدار آزمایشی
+          threshold = 4017.0
 
-          for alert in config.get("alerts", []):
-              if not alert.get("enabled", False):
-                  continue
+          if price <= threshold:
+              print("Alert not triggered.")
+              raise SystemExit(0)
 
-              level = float(alert["price"])
-              condition = alert["condition"]
+          # دریافت اطلاعات محرمانه از GitHub Secrets
+          api_key = os.environ.get("KAVENEGAR_API_KEY", "")
+          sender = os.environ.get("KAVENEGAR_SENDER", "")
+          receptor = os.environ.get("KAVENEGAR_RECEPTOR", "")
 
-              triggered = (
-                  condition == "above" and price > level
-              ) or (
-                  condition == "below" and price < level
+          if not all([api_key, sender, receptor]):
+              raise ValueError("SMS configuration is incomplete.")
+
+          message = (
+              f"Gold price alert! XAUUSD: {price} USD. "
+              f"Threshold: {threshold} USD."
+          )
+
+          endpoint = (
+              f"https://api.kavenegar.com/v1/"
+              f"{urllib.parse.quote(api_key, safe='')}/sms/send.json"
+          )
+
+          payload = urllib.parse.urlencode({
+              "sender": sender,
+              "receptor": receptor,
+              "message": message
+          }).encode("utf-8")
+
+          request = urllib.request.Request(
+              endpoint,
+              data=payload,
+              headers={
+                  "Content-Type":
+                  "application/x-www-form-urlencoded"
+              },
+              method="POST"
+          )
+
+          with urllib.request.urlopen(request, timeout=20) as response:
+              result = json.loads(
+                  response.read().decode("utf-8")
               )
 
-              if triggered:
-                  print(
-                      f"ALERT TRIGGERED: {alert['name']} | "
-                      f"Price: {price} | Level: {level}"
-                  )
-              else:
-                  print(
-                      f"Alert not triggered: {alert['name']} | "
-                      f"Price: {price} | Level: {level}"
-                  )
+          status = result.get("return", {}).get("status")
+
+          if status != 200:
+              raise RuntimeError(
+                  "Kavenegar did not confirm the SMS request."
+              )
+
+          print("Kavenegar accepted the SMS request.")
           PY
+```
