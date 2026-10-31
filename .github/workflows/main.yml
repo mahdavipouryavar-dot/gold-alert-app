@@ -1,17 +1,25 @@
-```yaml
-name: Gold Price Monitor Test
+name: Gold Price Monitor
 
 on:
   workflow_dispatch:
   schedule:
     - cron: "*/5 * * * *"
 
+permissions:
+  contents: write
+
 jobs:
   monitor:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Download repository files
+      - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
 
       - name: Check gold price and send SMS
         env:
@@ -24,73 +32,98 @@ jobs:
           import os
           import urllib.request
           import urllib.parse
+          import pathlib
 
-          # دریافت قیمت طلا
+          # Get gold price
           url = "https://xaus.com/api/v1/spot"
           req = urllib.request.Request(
               url,
               headers={"User-Agent": "GoldAlertApp/1.0"}
           )
 
-          with urllib.request.urlopen(req, timeout=20) as response:
-              data = json.loads(response.read().decode("utf-8"))
+          with urllib.request.urlopen(req, timeout=20) as r:
+              data = json.loads(r.read().decode())
 
           price = float(data["spot_usd_oz"])
-          print(f"Current XAUUSD price: {price}")
+          print(f"Current XAUUSD: {price}")
 
-          # حد هشدار آزمایشی
-          threshold = 4017.0
+          # Load alerts
+          path = pathlib.Path("alerts.json")
+          config = json.loads(path.read_text(encoding="utf-8"))
 
-          if price <= threshold:
-              print("Alert not triggered.")
-              raise SystemExit(0)
+          state_path = pathlib.Path("alert_state.json")
+          if state_path.exists():
+              state = json.loads(state_path.read_text())
+          else:
+              state = {}
 
-          # دریافت اطلاعات محرمانه از GitHub Secrets
-          api_key = os.environ.get("KAVENEGAR_API_KEY", "")
-          sender = os.environ.get("KAVENEGAR_SENDER", "")
-          receptor = os.environ.get("KAVENEGAR_RECEPTOR", "")
+          api_key = os.environ["KAVENEGAR_API_KEY"]
+          sender = os.environ["KAVENEGAR_SENDER"]
+          receptor = os.environ["KAVENEGAR_RECEPTOR"]
 
-          if not all([api_key, sender, receptor]):
-              raise ValueError("SMS configuration is incomplete.")
+          for alert in config["alerts"]:
+              if not alert.get("enabled", False):
+                  continue
 
-          message = (
-              f"Gold price alert! XAUUSD: {price} USD. "
-              f"Threshold: {threshold} USD."
-          )
+              name = alert["name"]
+              condition = alert["condition"]
+              target = float(alert["price"])
 
-          endpoint = (
-              f"https://api.kavenegar.com/v1/"
-              f"{urllib.parse.quote(api_key, safe='')}/sms/send.json"
-          )
-
-          payload = urllib.parse.urlencode({
-              "sender": sender,
-              "receptor": receptor,
-              "message": message
-          }).encode("utf-8")
-
-          request = urllib.request.Request(
-              endpoint,
-              data=payload,
-              headers={
-                  "Content-Type":
-                  "application/x-www-form-urlencoded"
-              },
-              method="POST"
-          )
-
-          with urllib.request.urlopen(request, timeout=20) as response:
-              result = json.loads(
-                  response.read().decode("utf-8")
+              triggered = (
+                  (condition == "above" and price >= target)
+                  or
+                  (condition == "below" and price <= target)
               )
 
-          status = result.get("return", {}).get("status")
+              was_triggered = state.get(name, False)
 
-          if status != 200:
-              raise RuntimeError(
-                  "Kavenegar did not confirm the SMS request."
-              )
+              if triggered and not was_triggered:
+                  message = (
+                      f"{name}: XAUUSD is {price} USD. "
+                      f"Target: {target} USD"
+                  )
 
-          print("Kavenegar accepted the SMS request.")
+                  endpoint = (
+                      f"https://api.kavenegar.com/v1/"
+                      f"{urllib.parse.quote(api_key, safe='')}/sms/send.json"
+                  )
+
+                  payload = urllib.parse.urlencode({
+                      "sender": sender,
+                      "receptor": receptor,
+                      "message": message
+                  }).encode()
+
+                  request = urllib.request.Request(
+                      endpoint,
+                      data=payload,
+                      method="POST"
+                  )
+
+                  with urllib.request.urlopen(request, timeout=20) as r:
+                      result = json.loads(r.read().decode())
+
+                  if result.get("return", {}).get("status") != 200:
+                      raise RuntimeError("SMS sending failed")
+
+                  print(f"SMS sent: {name}")
+                  state[name] = True
+
+              elif not triggered:
+                  state[name] = False
+
+          state_path.write_text(
+              json.dumps(state, ensure_ascii=False, indent=2),
+              encoding="utf-8"
+          )
           PY
-```
+
+      - name: Save alert state
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add alert_state.json
+          git diff --cached --quiet || (
+            git commit -m "Update alert state" &&
+            git push
+          )
