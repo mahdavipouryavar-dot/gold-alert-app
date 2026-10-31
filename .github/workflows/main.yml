@@ -16,11 +16,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
       - name: Check gold price and send SMS
         env:
           KAVENEGAR_API_KEY: ${{ secrets.KAVENEGAR_API_KEY }}
@@ -33,27 +28,40 @@ jobs:
           import urllib.request
           import urllib.parse
           import pathlib
+          import time
 
-          # Get gold price
+          # دریافت قیمت طلا
           url = "https://xaus.com/api/v1/spot"
-          req = urllib.request.Request(
-              url,
-              headers={"User-Agent": "GoldAlertApp/1.0"}
-          )
 
-          with urllib.request.urlopen(req, timeout=20) as r:
-              data = json.loads(r.read().decode())
+          headers = {
+              "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/131.0.0.0 Safari/537.36",
+              "Accept": "application/json, text/plain, */*",
+              "Referer": "https://xaus.com/",
+              "Origin": "https://xaus.com",
+              "Cache-Control": "no-cache"
+          }
+
+          req = urllib.request.Request(url, headers=headers)
+
+          try:
+              with urllib.request.urlopen(req, timeout=30) as response:
+                  data = json.loads(response.read().decode("utf-8"))
+          except Exception as e:
+              print(f"Price API error: {e}")
+              raise
 
           price = float(data["spot_usd_oz"])
           print(f"Current XAUUSD: {price}")
 
-          # Load alerts
-          path = pathlib.Path("alerts.json")
-          config = json.loads(path.read_text(encoding="utf-8"))
+          # خواندن هشدارها
+          config = json.loads(
+              pathlib.Path("alerts.json").read_text(encoding="utf-8")
+          )
 
           state_path = pathlib.Path("alert_state.json")
+
           if state_path.exists():
-              state = json.loads(state_path.read_text())
+              state = json.loads(state_path.read_text(encoding="utf-8"))
           else:
               state = {}
 
@@ -62,6 +70,7 @@ jobs:
           receptor = os.environ["KAVENEGAR_RECEPTOR"]
 
           for alert in config["alerts"]:
+
               if not alert.get("enabled", False):
                   continue
 
@@ -70,16 +79,17 @@ jobs:
               target = float(alert["price"])
 
               triggered = (
-                  (condition == "above" and price >= target)
-                  or
-                  (condition == "below" and price <= target)
+                  condition == "above" and price >= target
+              ) or (
+                  condition == "below" and price <= target
               )
 
               was_triggered = state.get(name, False)
 
               if triggered and not was_triggered:
+
                   message = (
-                      f"{name}: XAUUSD is {price} USD. "
+                      f"{name}: XAUUSD price is {price} USD. "
                       f"Target: {target} USD"
                   )
 
@@ -92,19 +102,19 @@ jobs:
                       "sender": sender,
                       "receptor": receptor,
                       "message": message
-                  }).encode()
+                  }).encode("utf-8")
 
-                  request = urllib.request.Request(
+                  sms_request = urllib.request.Request(
                       endpoint,
                       data=payload,
                       method="POST"
                   )
 
-                  with urllib.request.urlopen(request, timeout=20) as r:
-                      result = json.loads(r.read().decode())
+                  with urllib.request.urlopen(sms_request, timeout=30) as r:
+                      result = json.loads(r.read().decode("utf-8"))
 
                   if result.get("return", {}).get("status") != 200:
-                      raise RuntimeError("SMS sending failed")
+                      raise RuntimeError(f"SMS failed: {result}")
 
                   print(f"SMS sent: {name}")
                   state[name] = True
@@ -116,6 +126,8 @@ jobs:
               json.dumps(state, ensure_ascii=False, indent=2),
               encoding="utf-8"
           )
+
+          print("Monitoring completed.")
           PY
 
       - name: Save alert state
