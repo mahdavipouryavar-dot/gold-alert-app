@@ -1,11 +1,18 @@
 {
-"alerts": [
-{
-"name": "هشدار آزمایشی طلا",
-"symbol": "XAUUSD",
-"condition": "above",
-"price": 4500,
-"enabled": true
-}
-]
+  "alerts": [
+    {
+      "name": "هشدار صعودی طلا",
+      "symbol": "XAUUSD",
+      "condition": "above",
+      "price": 4500,
+      "enabled": true
+    },
+    {
+      "name": "هشدار نزولی طلا",
+      "symbol": "XAUUSD",
+      "condition": "below",
+      "price": 4000,
+      "enabled": true
+    }
+  ]
 }
